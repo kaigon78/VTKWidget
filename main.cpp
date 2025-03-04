@@ -7,15 +7,19 @@
 *  @copyright Copyright (c) 2025 Koh Young Inc., All rights reserved.
 */
 
-#include "MainWindow.h"
+#include "NiiViewer.h"
+#include <vtkAutoInit.h>
+VTK_MODULE_INIT(vtkRenderingOpenGL2);
+VTK_MODULE_INIT(vtkInteractionStyle);
+VTK_MODULE_INIT(vtkRenderingVolumeOpenGL2);
 
 #include <QApplication>
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    MainWindow w;
+    NiiViewer w;
     w.show();
-    w.loadFile("C:/Users/kai/Downloads/Stanford_Bunny_sample.stl");
+    w.loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
     return a.exec();
 }

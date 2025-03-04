@@ -57,13 +57,33 @@ find_package(VTK REQUIRED COMPONENTS
     RenderingOpenGL2
     IOGeometry
     IOLegacy
+    IOImage
+    RenderingCore
+    InteractionStyle
+    RenderingVolume
+    ImagingCore
+    ImagingGeneral
+    RenderingVolume
+    RenderingVolumeOpenGL2
+    IOMINC
 )
+
+vtk_module_autoinit(
+    vtkRenderingOpenGL2
+    vtkRenderingVolumeOpenGL2
+    TARGETS VTKWidget
+)
+
+include_directories(${VTK_INCLUDE_DIRS})
 
 set(SOURCES
     main.cpp
     MainWindow.cpp
     MainWindow.h
     MainWindow.ui
+    NiiViewer.cpp
+    NiiViewer.h
+    NiiViewer.ui
 )
 
 add_executable(VTKWidget
@@ -76,7 +96,19 @@ target_link_libraries(VTKWidget PRIVATE
     VTK::RenderingOpenGL2
     VTK::IOGeometry
     VTK::IOLegacy
+    VTK::IOImage
+    VTK::RenderingCore
+    VTK::InteractionStyle
+    VTK::RenderingVolume
+    VTK::ImagingCore
+    VTK::ImagingGeneral
+    VTK::RenderingVolume
+    VTK::RenderingVolumeOpenGL2
+    VTK::IOMINC
+    VTK::RenderingVolumeOpenGL2
 )
+
+include(${VTK_USE_FILE})
 
 set_target_properties(VTKWidget PROPERTIES
     WIN32_EXECUTABLE TRUE
