@@ -7,7 +7,8 @@
 *  @copyright Copyright (c) 2025 Koh Young Inc., All rights reserved.
 */
 
-#include "NiiViewer.h"
+//#include "NiiViewer.h"
+#include "MainWindow.h"
 #include <vtkAutoInit.h>
 VTK_MODULE_INIT(vtkRenderingOpenGL2);
 VTK_MODULE_INIT(vtkInteractionStyle);
@@ -18,8 +19,9 @@ VTK_MODULE_INIT(vtkRenderingVolumeOpenGL2);
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    NiiViewer w;
+    MainWindow w;
+    //NiiViewer w;
     w.show();
-    w.loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
+    //w.loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
     return a.exec();
 }

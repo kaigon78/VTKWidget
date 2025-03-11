@@ -15,18 +15,7 @@
 #include <vtkSmartPointer.h>
 #include <vtkGenericOpenGLRenderWindow.h>
 #include <vtkRenderer.h>
-//#include <vtkActor.h>
-//#include <vtkPolyDataMapper.h>
-//#include <vtkSTLReader.h>
-//#include <vtkPolyDataReader.h>
-#include <vtkNIFTIImageReader.h>
-//#include <vtkImageActor.h>
-#include <vtkImageMapper3D.h>
-#include <QVTKOpenGLWidget.h>
 #include <vtkVolume.h>
-#include <vtkGPUVolumeRayCastMapper.h>
-#include <vtkPiecewiseFunction.h>
-#include <vtkVolumeProperty.h>
 #include <QSlider>
 
 class NiiViewer : public QMainWindow
@@ -38,15 +27,14 @@ public:
     ~NiiViewer();
     void loadFile(const std::string &filename);
 
-private slots:
-    void changeTransparency(int value);
+public slots:
+    void changeTransparency(double value);
 
 private:
     QVTKOpenGLNativeWidget *vtkWidget;
     vtkSmartPointer<vtkGenericOpenGLRenderWindow> renderWindow;
     vtkSmartPointer<vtkRenderer> renderer;
     vtkSmartPointer<vtkVolume> volume;
-    QSlider* transparencySlider;
 };
 
 #endif // NIIVIEWER_H

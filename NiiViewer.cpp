@@ -1,9 +1,16 @@
 #include "NiiViewer.h"
-//#include <vtkImageSliceMapper.h>
+#include <vtkNIFTIImageReader.h>
+//#include <vtkImageMapper3D.h>
+//#include <QVTKOpenGLWidget.h>
+#include <vtkGPUVolumeRayCastMapper.h>
+#include <vtkPiecewiseFunction.h>
+#include <vtkVolumeProperty.h>
 #include <vtkImageData.h>
 #include <QDebug>
 #include <vtkSmartVolumeMapper.h>
 #include <vtkColorTransferFunction.h>
+//#include <vtkContourFilter.h>
+#include <vtkImageGaussianSmooth.h>
 
 NiiViewer::NiiViewer(QWidget *parent)
     : QMainWindow(parent)
@@ -16,14 +23,10 @@ NiiViewer::NiiViewer(QWidget *parent)
     vtkWidget->setRenderWindow(renderWindow);
     renderer->SetBackground(0.1, 0.2, 0.3);
 
-    transparencySlider = new QSlider(Qt::Horizontal, this);
-    transparencySlider->setRange(0,100);
-    transparencySlider->setValue(100);
-    transparencySlider->setFixedHeight(30);
-
-    connect(transparencySlider, &QSlider::valueChanged, this, &NiiViewer::changeTransparency);
-
     setCentralWidget(vtkWidget);
+    loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
+    renderWindow->Render();
+
 }
 
 NiiViewer::~NiiViewer()
@@ -64,6 +67,12 @@ void NiiViewer::loadFile(const std::string &filename)
     colorTransferFunction->AddRGBPoint(255, 1.0, 1.0, 1.0);
     volumeProperty->SetColor(colorTransferFunction);
 
+    vtkNew<vtkImageGaussianSmooth> filter;
+    filter->SetInputData(imageData);
+    filter->SetStandardDeviations(4.0, 4.0); // Adjust as needed
+    filter->SetRadiusFactors(2.0, 2.0); // Adjust as needed
+    filter->Update();
+
     volume = vtkSmartPointer<vtkVolume>::New();
     volume->SetMapper(volumeMapper);
     volume->SetProperty(volumeProperty);
@@ -75,13 +84,14 @@ void NiiViewer::loadFile(const std::string &filename)
     renderWindow->Render();
 }
 
-void NiiViewer::changeTransparency(int value)
+
+void NiiViewer::changeTransparency(double value)
 {
-    double opacityScale = value / 100.0;
     vtkSmartPointer<vtkPiecewiseFunction> opacityFunction = vtkSmartPointer<vtkPiecewiseFunction>::New();
     opacityFunction->AddPoint(0, 0.0);
-    opacityFunction->AddPoint(255, opacityScale);
-    volume->GetProperty()->SetScalarOpacity(opacityFunction);
+    opacityFunction->AddPoint(500, value);
+    volume->GetProperty()->SetGradientOpacity(opacityFunction);
 
     renderWindow->Render();
 }
+

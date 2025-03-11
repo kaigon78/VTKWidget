@@ -84,6 +84,12 @@ set(SOURCES
     NiiViewer.cpp
     NiiViewer.h
     NiiViewer.ui
+    ControllerWidget.h
+    ControllerWidget.cpp
+    ControllerWidget.ui
+    StatusViewer.h
+    StatusViewer.cpp
+    StatusViewer.ui
 )
 
 add_executable(VTKWidget
