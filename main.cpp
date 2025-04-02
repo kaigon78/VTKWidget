@@ -21,6 +21,7 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     MainWindow w;
     //NiiViewer w;
+    w.adjustSize();
     w.show();
     //w.loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
     return a.exec();

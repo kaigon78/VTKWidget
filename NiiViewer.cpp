@@ -1,7 +1,14 @@
+/*
+*  @file      NiiViewer.cpp
+*  @author    Kai Isozumi (kai.isozumi@kohyoung.com)
+*  @date      March 13, 2025
+*  @brief     This file is .nii file viewing for VTKWidget GUI application.
+*
+*  @copyright Copyright (c) 2025 Koh Young Inc., All rights reserved.
+*/
+
 #include "NiiViewer.h"
 #include <vtkNIFTIImageReader.h>
-//#include <vtkImageMapper3D.h>
-//#include <QVTKOpenGLWidget.h>
 #include <vtkGPUVolumeRayCastMapper.h>
 #include <vtkPiecewiseFunction.h>
 #include <vtkVolumeProperty.h>
@@ -9,8 +16,18 @@
 #include <QDebug>
 #include <vtkSmartVolumeMapper.h>
 #include <vtkColorTransferFunction.h>
-//#include <vtkContourFilter.h>
 #include <vtkImageGaussianSmooth.h>
+#include <vtkMarchingCubes.h>
+#include <vtkStripper.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkImageThreshold.h>
+#include <vtkSmoothPolyDataFilter.h>
+#include <vtkWindowedSincPolyDataFilter.h>
+#include <vtkPolyDataToImageStencil.h>
+#include <vtkImageStencil.h>
+#include <vtkCleanPolyData.h>
+#include <vtkPolyDataNormals.h>
+#include <vtkProperty.h>
 
 NiiViewer::NiiViewer(QWidget *parent)
     : QMainWindow(parent)
@@ -21,12 +38,12 @@ NiiViewer::NiiViewer(QWidget *parent)
     renderWindow->AddRenderer(renderer);
 
     vtkWidget->setRenderWindow(renderWindow);
-    renderer->SetBackground(0.1, 0.2, 0.3);
+    renderer->SetBackground(0.0, 0.0, 0.0);
 
     setCentralWidget(vtkWidget);
+    setWindowTitle("");
     loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
     renderWindow->Render();
-
 }
 
 NiiViewer::~NiiViewer()
@@ -36,25 +53,59 @@ NiiViewer::~NiiViewer()
 
 void NiiViewer::loadFile(const std::string &filename)
 {
-    qDebug() << "OpenGL Version: " << QString::fromStdString(renderWindow->ReportCapabilities()) << "END\n\n";
-
-    // Load the NIfTI file
     vtkSmartPointer<vtkNIFTIImageReader> reader = vtkSmartPointer<vtkNIFTIImageReader>::New();
     reader->SetFileName(filename.c_str());
     reader->Update();
 
-    vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
+    vtkSmartPointer<vtkImageThreshold> threshold = vtkSmartPointer<vtkImageThreshold>::New();
+    threshold->SetInputConnection(reader->GetOutputPort());
+    threshold->ThresholdByLower(900);
+    threshold->ReplaceInOn();
+    threshold->SetInValue(0);
+    threshold->Update();
 
-    // Volume Rendering
+    vtkSmartPointer<vtkImageGaussianSmooth> volumeSmooth = vtkSmartPointer<vtkImageGaussianSmooth>::New();
+    volumeSmooth->SetInputConnection(threshold->GetOutputPort());
+    volumeSmooth->SetStandardDeviations(1.0, 1.0, 1.0);
+    volumeSmooth->SetRadiusFactors(2.0, 2.0, 2.0);
+    volumeSmooth->Update();
+
+    vtkSmartPointer<vtkMarchingCubes> toPolyData = vtkSmartPointer<vtkMarchingCubes>::New();
+    toPolyData->SetInputConnection(volumeSmooth->GetOutputPort());
+    toPolyData->SetValue(0, 1150);
+    toPolyData->Update();
+
+    vtkSmartPointer<vtkCleanPolyData> cleanPoly = vtkSmartPointer<vtkCleanPolyData>::New();
+    cleanPoly->SetInputConnection(toPolyData->GetOutputPort());
+    cleanPoly->Update();
+
+    vtkSmartPointer<vtkSmoothPolyDataFilter> surfaceSmooth = vtkSmartPointer<vtkSmoothPolyDataFilter>::New();
+    surfaceSmooth->SetInputConnection(cleanPoly->GetOutputPort());
+    surfaceSmooth->SetNumberOfIterations(10);
+    surfaceSmooth->SetRelaxationFactor(0.1);
+    surfaceSmooth->FeatureEdgeSmoothingOff();
+    surfaceSmooth->BoundarySmoothingOn();
+    surfaceSmooth->Update();
+
+    for (int i = 0; i < 9; ++i)
+    {
+        vtkSmartPointer<vtkSmoothPolyDataFilter> smoothIteration = vtkSmartPointer<vtkSmoothPolyDataFilter>::New();
+        smoothIteration->SetInputConnection(surfaceSmooth->GetOutputPort());
+        smoothIteration->SetNumberOfIterations(15);
+        smoothIteration->SetRelaxationFactor(0.1);
+        smoothIteration->FeatureEdgeSmoothingOff();
+        smoothIteration->BoundarySmoothingOn();
+        smoothIteration->Update();
+        surfaceSmooth = smoothIteration;
+    }
     vtkSmartPointer<vtkGPUVolumeRayCastMapper> volumeMapper = vtkSmartPointer<vtkGPUVolumeRayCastMapper>::New();
-    //vtkSmartPointer<vtkSmartVolumeMapper> volumeMapper = vtkSmartPointer<vtkSmartVolumeMapper>::New();
-    volumeMapper->SetInputData(imageData);
-//    volumeMapper->SetRequestedRenderModeToRayCast();
+    volumeMapper->SetInputConnection(volumeSmooth->GetOutputPort());
 
-    // Set Volume Properties (Opacity and Color)
     vtkSmartPointer<vtkVolumeProperty> volumeProperty = vtkSmartPointer<vtkVolumeProperty>::New();
     volumeProperty->SetInterpolationTypeToLinear();
     volumeProperty->ShadeOn();
+
+    vtkSmartPointer<vtkProperty> surfaceProperty = vtkSmartPointer<vtkProperty>::New();
 
     vtkSmartPointer<vtkPiecewiseFunction> opacityTransferFunction = vtkSmartPointer<vtkPiecewiseFunction>::New();
     opacityTransferFunction->AddPoint(0, 0.0);
@@ -64,34 +115,56 @@ void NiiViewer::loadFile(const std::string &filename)
     vtkSmartPointer<vtkColorTransferFunction> colorTransferFunction = vtkSmartPointer<vtkColorTransferFunction>::New();
     colorTransferFunction->AddRGBPoint(0, 0.0, 0.0, 0.0);
     colorTransferFunction->AddRGBPoint(128, 1.0, 0.5, 0.3);
-    colorTransferFunction->AddRGBPoint(255, 1.0, 1.0, 1.0);
-    volumeProperty->SetColor(colorTransferFunction);
+    colorTransferFunction->AddRGBPoint(258, 1.0, 1.0, 1.0);
+    colorTransferFunction->AddRGBPoint(3000, 1.0, 1.0, 1.0);
 
-    vtkNew<vtkImageGaussianSmooth> filter;
-    filter->SetInputData(imageData);
-    filter->SetStandardDeviations(4.0, 4.0); // Adjust as needed
-    filter->SetRadiusFactors(2.0, 2.0); // Adjust as needed
-    filter->Update();
+    volumeProperty->SetColor(colorTransferFunction);
 
     volume = vtkSmartPointer<vtkVolume>::New();
     volume->SetMapper(volumeMapper);
     volume->SetProperty(volumeProperty);
 
-    // Render
+    vtkSmartPointer<vtkPolyDataMapper> surfaceMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    surfaceMapper->SetInputConnection(surfaceSmooth->GetOutputPort());
+    surfaceMapper->ScalarVisibilityOn();
+    surfaceMapper->SetScalarRange(0, 3071);
+
+    surfaceProperty->SetColor(1.0, 1.0, 1.0);
+
+    surfaceActor = vtkSmartPointer<vtkActor>::New();
+    surfaceActor->SetMapper(surfaceMapper);
+    surfaceActor->SetProperty(surfaceProperty);
+
+    qDebug() << "Before Smoothing: " << toPolyData->GetOutput()->GetNumberOfPoints();
+    qDebug() << "After Smoothing: " << surfaceSmooth->GetOutput()->GetNumberOfPoints();
+
     renderer->RemoveAllViewProps();
     renderer->AddVolume(volume);
+    renderer->AddActor(surfaceActor);
     renderer->ResetCamera();
     renderWindow->Render();
 }
-
 
 void NiiViewer::changeTransparency(double value)
 {
     vtkSmartPointer<vtkPiecewiseFunction> opacityFunction = vtkSmartPointer<vtkPiecewiseFunction>::New();
     opacityFunction->AddPoint(0, 0.0);
     opacityFunction->AddPoint(500, value);
-    volume->GetProperty()->SetGradientOpacity(opacityFunction);
+    opacityFunction->AddPoint(3071, value);
 
+    volume->GetProperty()->SetGradientOpacity(opacityFunction);
+    surfaceActor->GetProperty()->SetOpacity(value);
     renderWindow->Render();
 }
 
+void NiiViewer::changeColor(const QColor &color)
+{
+    double r = color.redF();
+    double g = color.greenF();
+    double b = color.blueF();
+
+    vtkSmartPointer<vtkColorTransferFunction> colorFunction = vtkSmartPointer<vtkColorTransferFunction>::New();
+    colorFunction->AddRGBPoint(500, r, g, b);
+    volume->GetProperty()->SetColor(colorFunction);
+    surfaceActor->GetProperty()->SetColor(r, g, b);
+}
