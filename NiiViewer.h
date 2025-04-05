@@ -30,6 +30,8 @@ public:
 public slots:
     void changeTransparency(double value);
     void changeColor(const QColor &color);
+    void NiiViewer::addLine();
+
 
 private:
     QVTKOpenGLNativeWidget *vtkWidget;
