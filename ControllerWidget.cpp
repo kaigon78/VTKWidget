@@ -19,13 +19,11 @@ ControllerWidget::ControllerWidget(QWidget *parent)
     , ui(new Ui::ControllerWidget)
 {
     ui->setupUi(this);
-    //transparencySlider = new QSlider(Qt::Horizontal, this);
+
     ui->m_transparencySlider->setRange(0,100);
     ui->m_transparencySlider->setTickInterval(1);
     ui->m_transparencySlider->setValue(100);
     ui->m_transparencySlider->setFixedWidth(300);
-
-    //colorButton = new QPushButton("Select Bone Color", this);
 
     connect(ui->m_transparencySlider, &QSlider::valueChanged, this, &ControllerWidget::changeTransparency);
     connect(ui->m_colorButton, &QPushButton::clicked, this, &ControllerWidget::openColorDialog);
@@ -47,4 +45,9 @@ void ControllerWidget::openColorDialog()
     QColor color = QColorDialog::getColor(Qt::white, nullptr, "Select Color");
     if (color.isValid())
         emit colorChanged(color);
+}
+
+void ControllerWidget::openPointInputWidget()
+{
+
 }

@@ -38,4 +38,3 @@ StatusViewer::~StatusViewer()
 {
     delete ui;
 }
-

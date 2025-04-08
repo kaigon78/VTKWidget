@@ -67,6 +67,7 @@ find_package(VTK REQUIRED COMPONENTS
     RenderingVolumeOpenGL2
     IOMINC
     ImagingStencil
+    CommonComputationalGeometry
 )
 
 vtk_module_autoinit(
@@ -114,6 +115,7 @@ target_link_libraries(VTKWidget PRIVATE
     VTK::IOMINC
     VTK::RenderingVolumeOpenGL2
     VTK::ImagingStencil
+    VTK::CommonComputationalGeometry
 )
 
 include(${VTK_USE_FILE})

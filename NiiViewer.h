@@ -26,11 +26,11 @@ public:
     explicit NiiViewer(QWidget *parent = nullptr);
     ~NiiViewer();
     void loadFile(const std::string &filename);
+    void addLine();
 
 public slots:
     void changeTransparency(double value);
     void changeColor(const QColor &color);
-    void NiiViewer::addLine();
 
 
 private:

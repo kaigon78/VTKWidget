@@ -14,22 +14,16 @@
 #include <vtkVolumeProperty.h>
 #include <vtkImageData.h>
 #include <QDebug>
-#include <vtkSmartVolumeMapper.h>
 #include <vtkColorTransferFunction.h>
 #include <vtkImageGaussianSmooth.h>
-#include <vtkMarchingCubes.h>
-#include <vtkStripper.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkImageThreshold.h>
-#include <vtkSmoothPolyDataFilter.h>
-#include <vtkWindowedSincPolyDataFilter.h>
-#include <vtkPolyDataToImageStencil.h>
-#include <vtkImageStencil.h>
-#include <vtkCleanPolyData.h>
-#include <vtkPolyDataNormals.h>
 #include <vtkProperty.h>
-#include <vtkImageResample.h>
 #include <vtkPolyLine.h>
+#include <vtkParametricFunctionSource.h>
+#include <vtkParametricSpline.h>
+#include <vtkSphereSource.h>
+#include <vtkGlyph3DMapper.h>
 
 NiiViewer::NiiViewer(QWidget *parent)
     : QMainWindow(parent)
@@ -114,34 +108,51 @@ void NiiViewer::loadFile(const std::string &filename)
 
 void NiiViewer::addLine()
 {
-    double initial[3] = {10.0, 20.0, 30.0};
-    double final[3] = {500.0, 600.0, 700.0};
+    double origin[3] = {50.0, 0.0, 0.0};
+    double p1[3] = {50.0, 100.0, 200.0};
+    double p2[3] = {150.0, 150.0, 150.0};
+    double p3[3] = {250, 250, 350};
 
     auto points = vtkSmartPointer<vtkPoints>::New();
-    points->InsertNextPoint(initial);
-    points->InsertNextPoint(final);
+    points->InsertNextPoint(origin);
+    points->InsertNextPoint(p1);
+    points->InsertNextPoint(p2);
+    points->InsertNextPoint(p3);
 
-    auto polyLine = vtkSmartPointer<vtkPolyLine>::New();
-    polyLine->GetPointIds()->SetNumberOfIds(2);
-    for (unsigned int i = 0; i < 2; i++)
-    {
-        polyLine->GetPointIds()->SetId(i, i);
-    }
-    auto line = vtkSmartPointer<vtkCellArray>::New();
-    line->InsertNextCell(polyLine);
+    auto spline = vtkSmartPointer<vtkParametricSpline>::New();
+    spline->SetPoints(points);
 
-    auto linePolyData = vtkSmartPointer<vtkPolyData>::New();
-    linePolyData->SetPoints(points);
-    linePolyData->SetLines(line);
+    auto functionSource = vtkSmartPointer<vtkParametricFunctionSource>::New();
+    functionSource->SetParametricFunction(spline);
+    functionSource->Update();
 
-    auto lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    lineMapper->SetInputData(linePolyData);
+    auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    mapper->SetInputConnection(functionSource->GetOutputPort());
 
-    auto lineActor = vtkSmartPointer<vtkActor>::New();
-    lineActor->SetMapper(lineMapper);
-    lineActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    auto actor = vtkSmartPointer<vtkActor>::New();
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    actor->GetProperty()->SetLineWidth(1.0);
 
-    renderer->AddActor(lineActor);
+    auto sphere = vtkSmartPointer<vtkSphereSource>::New();
+    sphere->SetRadius(2.0);
+    sphere->SetThetaResolution(12);
+    sphere->SetPhiResolution(12);
+
+    auto polyData = vtkSmartPointer<vtkPolyData>::New();
+    polyData->SetPoints(points);
+
+    auto pointMapper = vtkSmartPointer<vtkGlyph3DMapper>::New();
+    pointMapper->SetInputData(polyData);
+    pointMapper->SetSourceConnection(sphere->GetOutputPort());
+    pointMapper->Update();
+
+    auto pointActor = vtkSmartPointer<vtkActor>::New();
+    pointActor->SetMapper(pointMapper);
+    pointActor->GetProperty()->SetColor(0.0, 1.0, 0.0);
+
+    renderer->AddActor(actor);
+    renderer->AddActor(pointActor);
     renderWindow->Render();
 }
 
@@ -165,5 +176,4 @@ void NiiViewer::changeColor(const QColor &color)
     auto colorFunction = vtkSmartPointer<vtkColorTransferFunction>::New();
     colorFunction->AddRGBPoint(500, r, g, b);
     volume->GetProperty()->SetColor(colorFunction);
-    surfaceActor->GetProperty()->SetColor(r, g, b);
 }

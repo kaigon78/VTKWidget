@@ -33,6 +33,7 @@ signals:
 private slots:
     void changeTransparency(double value);
     void openColorDialog();
+    void openPointInputWidget();
 
 private:
     Ui::ControllerWidget *ui;
