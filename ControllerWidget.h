@@ -13,6 +13,7 @@
 #include <QWidget>
 #include <QSlider>
 #include <QColorDialog>
+#include "StatusViewer.h"
 
 namespace Ui {
 class ControllerWidget;
@@ -25,19 +26,26 @@ class ControllerWidget : public QWidget
 public:
     explicit ControllerWidget(QWidget *parent = nullptr);
     ~ControllerWidget();
+    bool isLineShown();
+    void setStatusViewer(StatusViewer* viewer);
 
 signals:
     void transparencyChanged(double value);
     void colorChanged(const QColor &color);
+    void addLineRequested(bool lineShown);
 
 private slots:
     void changeTransparency(double value);
     void openColorDialog();
-    void openPointInputWidget();
+    void addLinePressed();
+    void resetOpacityToDefault();
+    void resetColorToDefault();
 
 private:
     Ui::ControllerWidget *ui;
     QPushButton *colorButton;
+    bool m_lineShown;
+    StatusViewer* statusViewer;
 };
 
 #endif // CONTROLLERWIDGET_H

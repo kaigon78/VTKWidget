@@ -23,8 +23,7 @@ class StatusViewer : public QWidget
 public:
     explicit StatusViewer(QWidget *parent = nullptr);
     ~StatusViewer();
-    void updateTransparencyValue(double value);
-    void updateColorValue(const QColor &color);
+    void addLog(const QString &message);
 
 private:
     Ui::StatusViewer *ui;

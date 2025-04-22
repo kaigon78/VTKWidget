@@ -19,15 +19,17 @@
 #include <vtkPolyDataMapper.h>
 #include <vtkImageThreshold.h>
 #include <vtkProperty.h>
+#include <vtkImageResample.h>
 #include <vtkPolyLine.h>
-#include <vtkParametricFunctionSource.h>
-#include <vtkParametricSpline.h>
 #include <vtkSphereSource.h>
 #include <vtkGlyph3DMapper.h>
+#include <vtkNew.h>
+#include <vtkCamera.h>
 
 NiiViewer::NiiViewer(QWidget *parent)
     : QMainWindow(parent)
     , vtkWidget(new QVTKOpenGLNativeWidget(this))
+    , statusViewer(nullptr)
 {
     renderWindow = vtkSmartPointer<vtkGenericOpenGLRenderWindow>::New();
     renderer = vtkSmartPointer<vtkRenderer>::New();
@@ -38,7 +40,7 @@ NiiViewer::NiiViewer(QWidget *parent)
 
     setCentralWidget(vtkWidget);
     setWindowTitle("");
-    loadFile("C:/Users/kai/projects/VTKWidget/resources/new_CT.nii");
+    loadFile("C:/Users/kai/projects/VTKWidget/resources/Head_with_electrode.nii");
     renderWindow->Render();
 }
 
@@ -53,20 +55,20 @@ void NiiViewer::loadFile(const std::string &filename)
     reader->SetFileName(filename.c_str());
     reader->Update();
 
-    auto threshold = vtkSmartPointer<vtkImageThreshold>::New();
+    vtkNew<vtkImageThreshold> threshold;
     threshold->SetInputConnection(reader->GetOutputPort());
     threshold->ThresholdByLower(900);
     threshold->ReplaceInOn();
     threshold->SetInValue(0);
     threshold->Update();
 
-    auto volumeSmooth = vtkSmartPointer<vtkImageGaussianSmooth>::New();
+    vtkNew<vtkImageGaussianSmooth> volumeSmooth;
     volumeSmooth->SetInputConnection(threshold->GetOutputPort());
     volumeSmooth->SetStandardDeviations(1.0, 1.0, 1.0);
     volumeSmooth->SetRadiusFactors(2.0, 2.0, 2.0);
     volumeSmooth->Update();
 
-    auto smoothedVolumeData = vtkSmartPointer<vtkImageData>::New();
+    vtkNew<vtkImageData> smoothedVolumeData;
     smoothedVolumeData->DeepCopy(volumeSmooth->GetOutput());
 
     auto volumeMapper = vtkSmartPointer<vtkGPUVolumeRayCastMapper>::New();
@@ -74,15 +76,15 @@ void NiiViewer::loadFile(const std::string &filename)
     volumeMapper->SetBlendModeToComposite();
     volumeMapper->AutoAdjustSampleDistancesOn();
     volumeMapper->SetAutoAdjustSampleDistances(1);
-\
-    auto opacityTransferFunction = vtkSmartPointer<vtkPiecewiseFunction>::New();
+
+    vtkNew<vtkPiecewiseFunction> opacityTransferFunction;
     opacityTransferFunction->AddPoint(0, 0.0);
     opacityTransferFunction->AddPoint(255, 0.1);
     opacityTransferFunction->AddPoint(500, 0.3);
     opacityTransferFunction->AddPoint(1500, 0.5);
-    opacityTransferFunction->AddPoint(3500, 0.8);
+    opacityTransferFunction->AddPoint(3500, 1.0);
 
-    auto colorTransferFunction = vtkSmartPointer<vtkColorTransferFunction>::New();
+    vtkNew<vtkColorTransferFunction> colorTransferFunction;
     colorTransferFunction->AddRGBPoint(0, 0.0, 0.0, 0.0);
     colorTransferFunction->AddRGBPoint(128, 1.0, 0.5, 0.3);
     colorTransferFunction->AddRGBPoint(258, 1.0, 1.0, 1.0);
@@ -102,57 +104,61 @@ void NiiViewer::loadFile(const std::string &filename)
     renderer->AddVolume(volume);
     renderer->ResetCamera();
     renderWindow->Render();
-
-    addLine();
+    createELectrodeLine();
 }
 
-void NiiViewer::addLine()
+void NiiViewer::createELectrodeLine()
 {
-    double origin[3] = {50.0, 0.0, 0.0};
-    double p1[3] = {50.0, 100.0, 200.0};
-    double p2[3] = {150.0, 150.0, 150.0};
-    double p3[3] = {250, 250, 350};
+    const std::vector<std::array<double, 3>> pointList = {
+                                                          {130.762, (260-114.956), 403*0.6},
+                                                          {123.462, (260-116.321), 425*0.6},
+                                                          {117.035, 260-117.051, 444*0.6},
+                                                          {107.767, 260-118.368, 471*0.6},
+                                                          {100.626, 260-118.844, 491*0.6},
+                                                          {91.745, 260-119.251, 514*0.6},
+                                                          {88.529, 260-119.040, 521*0.6},
+                                                          {85.820, 260-118.912, 526*0.6},
+                                                          {72.786, 260-117.135, 540*0.6},
+                                                          {66.713, 260-115.781, 544*0.6},
+                                                          {59.583, 260-113.326, 548*0.6},
+                                                          {50.104, 260-110.195, 551*0.6},
+                                                          {33.261, 260-103.085, 551*0.6},
+                                                          {24.882, 260-98.938, 548*0.6},
+                                                          {15.996, 260-93.712, 542*0.6},
+                                                          };
 
-    auto points = vtkSmartPointer<vtkPoints>::New();
-    points->InsertNextPoint(origin);
-    points->InsertNextPoint(p1);
-    points->InsertNextPoint(p2);
-    points->InsertNextPoint(p3);
+    vtkNew<vtkPoints> points;
+    vtkNew<vtkPolyLine> polyLine;
 
-    auto spline = vtkSmartPointer<vtkParametricSpline>::New();
-    spline->SetPoints(points);
+    polyLine->GetPointIds()->SetNumberOfIds(pointList.size());
+    for (vtkIdType i = 0; i < static_cast<vtkIdType>(pointList.size()); ++i)
+    {
+        points->InsertNextPoint(pointList[i].data());
+        polyLine->GetPointIds()->SetId(i, i);
+    }
 
-    auto functionSource = vtkSmartPointer<vtkParametricFunctionSource>::New();
-    functionSource->SetParametricFunction(spline);
-    functionSource->Update();
+    vtkNew<vtkCellArray> cells;
+    cells->InsertNextCell(polyLine);
+
+    vtkNew<vtkPolyData> polyData;
+    polyData->SetPoints(points);
+    polyData->SetLines(cells);
 
     auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInputConnection(functionSource->GetOutputPort());
+    mapper->SetInputData(polyData);
 
-    auto actor = vtkSmartPointer<vtkActor>::New();
-    actor->SetMapper(mapper);
-    actor->GetProperty()->SetColor(1.0, 0.0, 0.0);
-    actor->GetProperty()->SetLineWidth(1.0);
+    m_lineActor = vtkSmartPointer<vtkActor>::New();
+    m_lineActor->SetMapper(mapper);
+    m_lineActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    m_lineActor->GetProperty()->SetLineWidth(2.0);
 
-    auto sphere = vtkSmartPointer<vtkSphereSource>::New();
-    sphere->SetRadius(2.0);
-    sphere->SetThetaResolution(12);
-    sphere->SetPhiResolution(12);
+    renderer->AddActor(m_lineActor);
+    //renderWindow->Render();
+}
 
-    auto polyData = vtkSmartPointer<vtkPolyData>::New();
-    polyData->SetPoints(points);
-
-    auto pointMapper = vtkSmartPointer<vtkGlyph3DMapper>::New();
-    pointMapper->SetInputData(polyData);
-    pointMapper->SetSourceConnection(sphere->GetOutputPort());
-    pointMapper->Update();
-
-    auto pointActor = vtkSmartPointer<vtkActor>::New();
-    pointActor->SetMapper(pointMapper);
-    pointActor->GetProperty()->SetColor(0.0, 1.0, 0.0);
-
-    renderer->AddActor(actor);
-    renderer->AddActor(pointActor);
+void NiiViewer::addElectrodeLine(bool lineStatus)
+{
+    m_lineActor->SetVisibility(lineStatus);
     renderWindow->Render();
 }
 
@@ -176,4 +182,9 @@ void NiiViewer::changeColor(const QColor &color)
     auto colorFunction = vtkSmartPointer<vtkColorTransferFunction>::New();
     colorFunction->AddRGBPoint(500, r, g, b);
     volume->GetProperty()->SetColor(colorFunction);
+}
+
+void NiiViewer::setStatusViewer(StatusViewer* viewer)
+{
+    statusViewer = viewer;
 }

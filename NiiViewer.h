@@ -10,6 +10,7 @@
 #ifndef NIIVIEWER_H
 #define NIIVIEWER_H
 
+#include "StatusViewer.h"
 #include <QMainWindow>
 #include <QVTKOpenGLNativeWidget.h>
 #include <vtkSmartPointer.h>
@@ -26,19 +27,21 @@ public:
     explicit NiiViewer(QWidget *parent = nullptr);
     ~NiiViewer();
     void loadFile(const std::string &filename);
-    void addLine();
+    void createELectrodeLine();
+    void setStatusViewer(StatusViewer* viewer);
 
 public slots:
     void changeTransparency(double value);
     void changeColor(const QColor &color);
-
+    void addElectrodeLine(bool lineStatus);
 
 private:
     QVTKOpenGLNativeWidget *vtkWidget;
     vtkSmartPointer<vtkGenericOpenGLRenderWindow> renderWindow;
     vtkSmartPointer<vtkRenderer> renderer;
     vtkSmartPointer<vtkVolume> volume;
-    vtkSmartPointer<vtkActor> surfaceActor;
+    vtkSmartPointer<vtkActor> m_lineActor;
+    StatusViewer* statusViewer;
 };
 #endif // NIIVIEWER_H
 

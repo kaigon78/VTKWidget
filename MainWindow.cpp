@@ -17,7 +17,10 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
-    , ui(new Ui::m_mainWindow)
+    , ui(new Ui::MainWindow)
+    , niiViewer(nullptr)
+    , controllerWidget(nullptr)
+    , statusViewer(nullptr)
 {
     ui->setupUi(this);
     niiViewer = new NiiViewer(this);
@@ -29,7 +32,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->m_niiViewerWidget->layout()->setContentsMargins(0,0,0,0);
     ui->m_niiViewerWidget->layout()->addWidget(niiViewer);
 
-
     ui->m_controllerWidget->setLayout(new QGridLayout);
     ui->m_controllerWidget->layout()->setSpacing(0);
     ui->m_controllerWidget->layout()->setContentsMargins(0,0,0,0);
@@ -40,17 +42,22 @@ MainWindow::MainWindow(QWidget *parent)
     ui->m_statusViewerWidget->layout()->setContentsMargins(0,0,0,0);
     ui->m_statusViewerWidget->layout()->addWidget(statusViewer);
 
-    ui->m_niiViewerWidget->setMaximumSize(2500, 1300);
+    ui->m_niiViewerWidget->setMaximumSize(2500, 1800);
     ui->m_controllerWidget->setMaximumSize(500, 1300);
-    ui->m_statusViewerWidget->setMaximumSize(5000, 500);
+    ui->m_statusViewerWidget->setMaximumSize(500, 500);
+
+    controllerWidget->setStatusViewer(statusViewer);
+    niiViewer->setStatusViewer(statusViewer);
 
     connect(controllerWidget, &ControllerWidget::transparencyChanged, niiViewer, &NiiViewer::changeTransparency);
-    connect(controllerWidget, &ControllerWidget::transparencyChanged, statusViewer, &StatusViewer::updateTransparencyValue);
     connect(controllerWidget, &ControllerWidget::colorChanged, niiViewer, &NiiViewer::changeColor);
-    connect(controllerWidget, &ControllerWidget::colorChanged, statusViewer, &StatusViewer::updateColorValue);
+    connect(controllerWidget, &ControllerWidget::addLineRequested, niiViewer, &NiiViewer::addElectrodeLine);
 }
 
 MainWindow::~MainWindow()
 {
+    disconnect(controllerWidget, &ControllerWidget::transparencyChanged, niiViewer, &NiiViewer::changeTransparency);
+    disconnect(controllerWidget, &ControllerWidget::colorChanged, niiViewer, &NiiViewer::changeColor);
+
     delete ui;
 }

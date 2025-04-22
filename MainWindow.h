@@ -1,5 +1,5 @@
 /*
-*  @file      m_mainWindow.h
+*  @file      ainWindow.h
 *  @author    Kai Isozumi (kai.isozumi@kohyoung.com)
 *  @date      February 25, 2025
 *  @brief     This file is a main widget with three child widget header file for VTKWidget GUI application.
@@ -13,7 +13,7 @@
 #include <QMainWindow>
 
 namespace Ui {
-    class m_mainWindow;
+    class MainWindow;
 }
 
 class NiiViewer;
@@ -30,7 +30,7 @@ public:
 
 
 private:
-    Ui::m_mainWindow* ui;
+    Ui::MainWindow* ui;
     NiiViewer* niiViewer;
     ControllerWidget* controllerWidget;
     StatusViewer* statusViewer;

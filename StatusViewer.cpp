@@ -9,29 +9,22 @@
 
 #include "StatusViewer.h"
 #include "ui_StatusViewer.h"
+#include <QTime>
+#include <QTextEdit>
 
 StatusViewer::StatusViewer(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::StatusViewer)
 {
     ui->setupUi(this);
-    ui->m_transparencyLabel->setText("Transparency: 0");
-    ui->m_colorLabel->setText("Color: ");
 }
 
-void StatusViewer::updateTransparencyValue(double value) {
-    //ui->m_transparencyLabel->setText(QString("Transparency: ").append(QString::number(value)));
-    QString transparencyText = "Transparency: ";
-    transparencyText.append(QString::number(1-value, 'f', 3));
-    ui->m_transparencyLabel->setText(transparencyText);
-}
-
-void StatusViewer::updateColorValue(const QColor &color)
+void StatusViewer::addLog(const QString &message)
 {
-    QString colorText = "Color: ";
-    QString colorString = color.name(QColor::HexArgb);
-    colorText.append(colorString);
-    ui->m_colorLabel->setText(colorText);
+    QString timeStampedMessage = "[" + QTime::currentTime().toString("hh:mm:ss") + "]  \t" + message + "\n";
+    if(ui->m_logTextEdit->toPlainText().isEmpty())
+        ui->m_logTextEdit->setText((timeStampedMessage));
+    ui->m_logTextEdit->append(timeStampedMessage);
 }
 
 StatusViewer::~StatusViewer()
