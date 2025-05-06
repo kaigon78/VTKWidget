@@ -1,14 +1,13 @@
 /*
 *  @file      NiiViewer.cpp
 *  @author    Kai Isozumi (kai.isozumi@kohyoung.com)
-*  @date      March 13, 2025
-*  @brief     This file is .nii file viewing for VTKWidget GUI application.
+*  @date      May 6, 2025
+*  @brief     This file set variables of vtk viewer for nii file for VTKWidget GUI application.
 *
 *  @copyright Copyright (c) 2025 Koh Young Inc., All rights reserved.
 */
 
 #include "NiiViewer.h"
-#include <vtkNIFTIImageReader.h>
 #include <vtkGPUVolumeRayCastMapper.h>
 #include <vtkPiecewiseFunction.h>
 #include <vtkVolumeProperty.h>
@@ -19,12 +18,15 @@
 #include <vtkPolyDataMapper.h>
 #include <vtkImageThreshold.h>
 #include <vtkProperty.h>
-#include <vtkImageResample.h>
 #include <vtkPolyLine.h>
-#include <vtkSphereSource.h>
-#include <vtkGlyph3DMapper.h>
 #include <vtkNew.h>
-#include <vtkCamera.h>
+#include <vtkExtractVOI.h>
+#include <vtkCenterOfMass.h>
+#include <vtkPolyDataConnectivityFilter.h>
+#include <vtkContourFilter.h>
+#include <vtkNIFTIImageReader.h>
+
+using RegionInfo = std::array<double, 6>;
 
 NiiViewer::NiiViewer(QWidget *parent)
     : QMainWindow(parent)
@@ -55,7 +57,7 @@ void NiiViewer::loadFile(const std::string &filename)
     reader->SetFileName(filename.c_str());
     reader->Update();
 
-    vtkNew<vtkImageThreshold> threshold;
+    auto threshold = vtkSmartPointer<vtkImageThreshold>::New();
     threshold->SetInputConnection(reader->GetOutputPort());
     threshold->ThresholdByLower(900);
     threshold->ReplaceInOn();
@@ -68,7 +70,7 @@ void NiiViewer::loadFile(const std::string &filename)
     volumeSmooth->SetRadiusFactors(2.0, 2.0, 2.0);
     volumeSmooth->Update();
 
-    vtkNew<vtkImageData> smoothedVolumeData;
+    auto smoothedVolumeData = vtkSmartPointer<vtkImageData>::New();
     smoothedVolumeData->DeepCopy(volumeSmooth->GetOutput());
 
     auto volumeMapper = vtkSmartPointer<vtkGPUVolumeRayCastMapper>::New();
@@ -104,36 +106,102 @@ void NiiViewer::loadFile(const std::string &filename)
     renderer->AddVolume(volume);
     renderer->ResetCamera();
     renderWindow->Render();
-    createELectrodeLine();
+    createElectrodeLine(threshold);
 }
 
-void NiiViewer::createELectrodeLine()
+void NiiViewer::createElectrodeLine(vtkSmartPointer<vtkImageThreshold>& threshold)
 {
-    const std::vector<std::array<double, 3>> pointList = {
-                                                          {130.762, (260-114.956), 403*0.6},
-                                                          {123.462, (260-116.321), 425*0.6},
-                                                          {117.035, 260-117.051, 444*0.6},
-                                                          {107.767, 260-118.368, 471*0.6},
-                                                          {100.626, 260-118.844, 491*0.6},
-                                                          {91.745, 260-119.251, 514*0.6},
-                                                          {88.529, 260-119.040, 521*0.6},
-                                                          {85.820, 260-118.912, 526*0.6},
-                                                          {72.786, 260-117.135, 540*0.6},
-                                                          {66.713, 260-115.781, 544*0.6},
-                                                          {59.583, 260-113.326, 548*0.6},
-                                                          {50.104, 260-110.195, 551*0.6},
-                                                          {33.261, 260-103.085, 551*0.6},
-                                                          {24.882, 260-98.938, 548*0.6},
-                                                          {15.996, 260-93.712, 542*0.6},
-                                                          };
+    vtkNew<vtkExtractVOI> extractVOI;
+    extractVOI->SetInputConnection(threshold->GetOutputPort());
+    extractVOI->SetVOI(35, 500, 200, 500, 300, 560);
+    extractVOI->Update();
 
-    vtkNew<vtkPoints> points;
+    vtkNew<vtkImageThreshold> metalThreshold;
+    metalThreshold->SetInputConnection(extractVOI->GetOutputPort());
+    metalThreshold->ThresholdByLower(3050);
+    metalThreshold->ReplaceInOn();
+    metalThreshold->SetInValue(0);
+    metalThreshold->ReplaceOutOn();
+    metalThreshold->SetOutValue(1);
+    metalThreshold->Update();
+
+    int dims[3];
+    metalThreshold->GetOutput()->GetDimensions(dims);
+
+    std::vector<std::array<double,3>> electrodePoints;
+
+    for (int z = 240; /*dims[2];*/ z > 0; --z)
+    {
+        vtkNew<vtkExtractVOI> sliceVOI;
+        sliceVOI->SetInputConnection(metalThreshold->GetOutputPort());
+        sliceVOI->SetVOI(35, 500, 200, 500, z+300-1, z+300-1);
+        sliceVOI->SetSampleRate(1, 1, 1);
+        sliceVOI->Update();
+
+        vtkNew<vtkContourFilter> contour;
+        contour->SetInputConnection(sliceVOI->GetOutputPort());
+        contour->SetValue(0, 1.0);
+        contour->Update();
+
+        vtkNew<vtkPolyDataConnectivityFilter> connectivity;
+        connectivity->SetInputConnection(contour->GetOutputPort());
+        connectivity->SetExtractionModeToAllRegions();
+        connectivity->Update();
+
+        int regionCount = connectivity->GetNumberOfExtractedRegions();
+
+        for (int i = 0; i < regionCount; ++i)
+        {
+            connectivity->SetExtractionModeToSpecifiedRegions();
+            connectivity->AddSpecifiedRegion(i);
+            connectivity->Update();
+
+            vtkPolyData* region = connectivity->GetOutput();
+            double bounds[6];
+            region->GetBounds(bounds);
+
+            auto centerOfMass = vtkSmartPointer<vtkCenterOfMass>::New();
+            centerOfMass->SetInputData(region);
+            centerOfMass->SetUseScalarsAsWeights(false);
+            centerOfMass->Update();
+
+            double centerCoordinates[3];
+            centerOfMass->GetCenter(centerCoordinates);
+            std::array<double,3> center = {centerCoordinates[0], centerCoordinates[1], centerCoordinates[2]};
+
+            bool keep = false;
+            if (electrodePoints.empty())
+                keep = true;
+            else
+            {
+                auto last = electrodePoints.back();
+                double dx = center[0] - last[0];
+                double dy = center[1] - last[1];
+                double distance = std::sqrt(dx*dx + dy*dy);
+                if (distance < 5)
+                    keep = true;
+            }
+
+            if (keep)
+                electrodePoints.push_back(center);
+        }
+    }
+
+    drawElectrodeLine(electrodePoints);
+}
+
+void NiiViewer::drawElectrodeLine(std::vector<std::array<double,3>> pointsVector)
+{
+    auto points = vtkSmartPointer<vtkPoints>::New();
+    for (const auto& point : pointsVector)
+    {
+        points->InsertNextPoint(point[0], point[1], point[2]);
+    }
     vtkNew<vtkPolyLine> polyLine;
 
-    polyLine->GetPointIds()->SetNumberOfIds(pointList.size());
-    for (vtkIdType i = 0; i < static_cast<vtkIdType>(pointList.size()); ++i)
+    polyLine->GetPointIds()->SetNumberOfIds(pointsVector.size());
+    for (vtkIdType i = 0; i < static_cast<vtkIdType>(pointsVector.size()); ++i)
     {
-        points->InsertNextPoint(pointList[i].data());
         polyLine->GetPointIds()->SetId(i, i);
     }
 
@@ -153,7 +221,6 @@ void NiiViewer::createELectrodeLine()
     m_lineActor->GetProperty()->SetLineWidth(2.0);
 
     renderer->AddActor(m_lineActor);
-    //renderWindow->Render();
 }
 
 void NiiViewer::addElectrodeLine(bool lineStatus)
